@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "papersbot"
+version = "0.1.0"
+description = "A Telegram Bot that publishes daily AI papers in a channel"
+authors = ["Plutone11011 <lorenzo.borelli27@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+transformers = "^4.26.0"
+datasets = "^2.9.0"
+paperswithcode-client = "^0.3.1"
+pytelegrambotapi = "^4.9.0"
+python-dotenv = "^0.21.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
