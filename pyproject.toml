@@ -12,6 +12,8 @@ datasets = "^2.9.0"
 paperswithcode-client = "^0.3.1"
 pytelegrambotapi = "^4.9.0"
 python-dotenv = "^0.21.1"
+torch = "^1.13.1"
+timeloop = "^1.0.2"
 
 
 [build-system]

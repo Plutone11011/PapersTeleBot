@@ -25,7 +25,7 @@ class KeyphraseExtractionPipeline(TokenClassificationPipeline):
 
     def inference_abstract(self, text: str):
         # Load pipeline
-        text = text.replace("\n")
+        text = text.replace("\n", " ")
         model_name = "ml6team/keyphrase-extraction-kbir-inspec"
         extractor = KeyphraseExtractionPipeline(model=model_name)
         return extractor(text)
