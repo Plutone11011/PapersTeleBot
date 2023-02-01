@@ -5,7 +5,7 @@ from datetime import datetime
 import random, asyncio
 
 from extraction import KeyphraseExtractionPipeline
-
+from format import format_response
           
 
 def poll_papers():
@@ -32,7 +32,6 @@ def poll_papers():
 
     return {
             "title": current_paper.title,
-            "abstract": current_paper.abstract,
             "keyphrases": keyphrases,
             "url": current_paper.url_pdf
     }
@@ -70,15 +69,21 @@ class PeriodicBotTask:
         while True:
             await asyncio.sleep(self.time)
             results = self.func()
-            await bot.send_message("@publicforbot", " ".join(results["keyphrases"])) 
+            response = format_response(results)
+            print(response)
+            for chunk in response:
+                await bot.send_message("@publicforbot", chunk, parse_mode='HTML') 
 
 async def start_periodic(bot):
     
-    task = PeriodicBotTask(poll_papers, 10, bot)
+    task = PeriodicBotTask(poll_papers, 20, bot)
     await task.start()
     
 async def main(bot):
-    await asyncio.gather(bot.infinity_polling(), start_periodic(bot))
+    try:
+        await asyncio.gather(bot.infinity_polling(), start_periodic(bot))
+    except Exception as e:
+        print(e)
     
 if __name__ == '__main__':
     config = dotenv_values(".env")
