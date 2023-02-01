@@ -15,19 +15,19 @@ def poll_papers():
     today = datetime.today()
 
     current_paper = None
-    
-    for paper in papers.results:
-        if today.year == paper.published.year and today.month == paper.published.month and today.day == paper.published.day:
-            current_paper = paper
-            break
+    # keep only papers with a dataset
+    # filters math, physics and other papers
+    papers = [paper for paper in papers.results if len(client.paper_dataset_list(paper.id).results) > 0]
+    for paper in papers:
+            if today.year == paper.published.year and today.month == paper.published.month and today.day == paper.published.day:
+                current_paper = paper
+                break
     if current_paper is not None:
-        keyphrases = extraction.inference_abstract(current_paper.abstract)   
-        
-
+        keyphrases = extraction.inference_abstract(current_paper.abstract)    
     else:
         # pick random paper 
-        n = random.randint(0, len(papers.results) - 1)
-        current_paper = papers.results[n]
+        n = random.randint(0, len(papers) - 1)
+        current_paper = papers[n]
         keyphrases = extraction.inference_abstract(current_paper.abstract)
 
     return {
@@ -72,11 +72,11 @@ class PeriodicBotTask:
             response = format_response(results)
             print(response)
             for chunk in response:
-                await bot.send_message("@publicforbot", chunk, parse_mode='HTML') 
+                await bot.send_message("@publicforbot", chunk, parse_mode='MarkdownV2') 
 
 async def start_periodic(bot):
     
-    task = PeriodicBotTask(poll_papers, 20, bot)
+    task = PeriodicBotTask(poll_papers, 10, bot)
     await task.start()
     
 async def main(bot):
