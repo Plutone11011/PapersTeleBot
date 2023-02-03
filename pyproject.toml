@@ -14,6 +14,8 @@ pytelegrambotapi = "^4.9.0"
 python-dotenv = "^0.21.1"
 torch = "^1.13.1"
 timeloop = "^1.0.2"
+aiohttp = "^3.8.3"
+beautifulsoup4 = "^4.11.2"
 
 
 [build-system]

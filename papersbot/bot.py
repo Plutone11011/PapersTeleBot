@@ -2,33 +2,29 @@ from telebot.async_telebot import AsyncTeleBot
 from dotenv import dotenv_values
 from paperswithcode import PapersWithCodeClient
 from datetime import datetime
-import random, asyncio
+import random, asyncio, re
 
 from extraction import KeyphraseExtractionPipeline
-from format import format_response
-          
+from formatting import format_response
+from paperswithcode_scraper import get_latest_papers_title
 
-def poll_papers():
-    extraction = KeyphraseExtractionPipeline("ml6team/keyphrase-extraction-kbir-inspec") # first time, download takes a while
+async def poll_papers():
+
+    latest_papers_title = await get_latest_papers_title("https://paperswithcode.com/latest")
+    # filter out papers with math formula in titles since it is
+    # not possible to render latex natively in telegram
+    math_reg = r'\$.+?\$'
+    latest_papers_title = [paper_title for paper_title in latest_papers_title if re.match(math_reg, paper_title) is None]
+
+    
+    
     client = PapersWithCodeClient()
-    papers = client.paper_list()
-    today = datetime.today()
-
-    current_paper = None
-    # keep only papers with a dataset
-    # filters math, physics and other papers
-    papers = [paper for paper in papers.results if len(client.paper_dataset_list(paper.id).results) > 0]
-    for paper in papers:
-            if today.year == paper.published.year and today.month == paper.published.month and today.day == paper.published.day:
-                current_paper = paper
-                break
-    if current_paper is not None:
-        keyphrases = extraction.inference_abstract(current_paper.abstract)    
-    else:
-        # pick random paper 
-        n = random.randint(0, len(papers) - 1)
-        current_paper = papers[n]
-        keyphrases = extraction.inference_abstract(current_paper.abstract)
+    
+    papers_page = client.paper_list(q=f"{latest_papers_title[0]}")
+    
+    current_paper = papers_page.results[0]    
+    extraction = KeyphraseExtractionPipeline("ml6team/keyphrase-extraction-kbir-inspec") # first time, download takes a while
+    keyphrases = extraction.inference_abstract(current_paper.abstract)
 
     return {
             "title": current_paper.title,
@@ -36,8 +32,7 @@ def poll_papers():
             "url": current_paper.url_pdf
     }
         
-        #bot.send_message(self.chat_id, " ".join(keyphrases)) 
-
+    
 
 class PeriodicBotTask:
 
@@ -68,31 +63,22 @@ class PeriodicBotTask:
     async def _run(self):
         while True:
             await asyncio.sleep(self.time)
-            results = self.func()
-            response = format_response(results)
-            print(response)
-            for chunk in response:
-                await bot.send_message("@publicforbot", chunk, parse_mode='MarkdownV2') 
+            results = await self.func()
+            text = format_response(results)
+            await bot.send_message("@publicforbot", text, parse_mode='MarkdownV2') 
 
 async def start_periodic(bot):
     
     task = PeriodicBotTask(poll_papers, 10, bot)
     await task.start()
     
-async def main(bot):
-    try:
-        await asyncio.gather(bot.infinity_polling(), start_periodic(bot))
-    except Exception as e:
-        print(e)
     
 if __name__ == '__main__':
     config = dotenv_values(".env")
     bot = AsyncTeleBot(config["BOT_API_KEY"])
     
-    #asyncio.run(bot.polling())
     loop = asyncio.get_event_loop()
-    #_main = main(bot)
-    loop.run_until_complete(main(bot))
+    loop.run_until_complete(asyncio.gather(bot.infinity_polling(), start_periodic(bot)))
     
     
 
