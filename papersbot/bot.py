@@ -1,8 +1,8 @@
 from telebot.async_telebot import AsyncTeleBot
 from dotenv import dotenv_values
 from paperswithcode import PapersWithCodeClient
-from datetime import datetime
-import random, asyncio, re
+import json, asyncio, re, os
+from telebot.formatting import escape_markdown
 
 from extraction import KeyphraseExtractionPipeline
 from formatting import format_response
@@ -15,23 +15,52 @@ async def poll_papers():
     # not possible to render latex natively in telegram
     math_reg = r'\$.+?\$'
     latest_papers_title = [paper_title for paper_title in latest_papers_title if re.match(math_reg, paper_title) is None]
-
     
+    # find out the paper
+    # to send to telegram
+    history_papers_filename = "history_papers.json"
+    if not os.path.exists(history_papers_filename):
+        with open(history_papers_filename, "w") as history_paper_file:
+            json.dump({"history": []}, history_paper_file)
     
-    client = PapersWithCodeClient()
-    
-    papers_page = client.paper_list(q=f"{latest_papers_title[0]}")
-    
-    current_paper = papers_page.results[0]    
-    extraction = KeyphraseExtractionPipeline("ml6team/keyphrase-extraction-kbir-inspec") # first time, download takes a while
-    keyphrases = extraction.inference_abstract(current_paper.abstract)
-
-    return {
-            "title": current_paper.title,
-            "keyphrases": keyphrases,
-            "url": current_paper.url_pdf
-    }
+    current_paper_title = None
+    history_papers = []
+    with open(history_papers_filename, "r") as history_paper_file:
+        history_papers = json.load(history_paper_file).get("history")
+        if len(history_papers) > 0:
+            for latest_paper_title in latest_papers_title:
+                if latest_paper_title not in history_papers:
+                    current_paper_title = latest_paper_title
+                    
+        else:
+            current_paper_title = latest_papers_title[0]
+    if current_paper_title is not None:
+        with open(history_papers_filename, "w") as history_paper_file:
+            json.dump({"history": history_papers + [current_paper_title]}, history_paper_file)
         
+        
+        client = PapersWithCodeClient()
+        
+        papers_page = client.paper_list(q=f"{current_paper_title}")
+        
+        current_paper = papers_page.results[0]    
+        extraction = KeyphraseExtractionPipeline("ml6team/keyphrase-extraction-kbir-inspec") # first time, download takes a while
+        keyphrases = extraction.inference_abstract(current_paper.abstract)
+
+        return {
+                "title": current_paper_title,
+                "keyphrases": keyphrases,
+                "url": current_paper.url_pdf
+        }
+    else:
+        # every latest paper returned by the scraper
+        # is already in the history, so no new paper today
+        # might randomize (?)
+        return {
+            "title": "",
+            "keyphrases": [],
+            "url": "",
+        }
     
 
 class PeriodicBotTask:
@@ -64,7 +93,10 @@ class PeriodicBotTask:
         while True:
             await asyncio.sleep(self.time)
             results = await self.func()
-            text = format_response(results)
+            if results["title"] and len(results["keyphrases"]) and results["url"]:
+                text = format_response(results)
+            else:
+                text = escape_markdown("No new paper today.\n")
             await bot.send_message("@publicforbot", text, parse_mode='MarkdownV2') 
 
 async def start_periodic(bot):
